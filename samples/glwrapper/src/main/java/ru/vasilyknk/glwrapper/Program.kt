@@ -3,17 +3,25 @@ package ru.vasilyknk.glwrapper
 import android.opengl.GLES20
 import android.util.Log
 
-class Program internal constructor(vertexShaderCode: String, fragmentShaderCode: String) : AutoCloseable {
-    private val id: Int = initProgram(vertexShaderCode, fragmentShaderCode)
+class Program internal constructor(vertexShaderCode: String, fragmentShaderCode: String) : Resource {
+    private var id: Int? = initProgram(vertexShaderCode, fragmentShaderCode)
 
     fun use() {
-        GLES20.glUseProgram(id)
+        GLES20.glUseProgram(checkedId())
     }
 
-    fun getAttribLocation(name: String) = GLES20.glGetAttribLocation(id, name)
-    fun getUniformLocation(name: String) = GLES20.glGetUniformLocation(id, name)
+    fun getAttribLocation(name: String) = GLES20.glGetAttribLocation(checkedId(), name)
+    fun getUniformLocation(name: String) = GLES20.glGetUniformLocation(checkedId(), name)
 
-    override fun close() {
+    override fun free() {
+        val checkedId = id ?: return
+        GLES20.glDeleteProgram(checkedId)
+    }
+
+    override fun isValid() = (id != null)
+
+    private fun checkedId(): Int {
+        return id ?: throw RuntimeException("Invalid program")
     }
 }
 
