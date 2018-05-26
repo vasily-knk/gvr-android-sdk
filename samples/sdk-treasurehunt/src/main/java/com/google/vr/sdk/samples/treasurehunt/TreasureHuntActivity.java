@@ -38,7 +38,8 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 
-import ru.simlabs.glwrapper.Program;
+import ru.vasily_knk.glwrapper.Program;
+import ru.vasily_knk.glwrapper.Uniforms;
 
 /**
  * A Google VR sample application.
@@ -91,6 +92,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private FloatBuffer cubeFoundColors;
   private FloatBuffer cubeNormals;
 
+  private Uniforms uniforms = new Uniforms();
   private Program cubeProgram;
   private Program floorProgram;
   

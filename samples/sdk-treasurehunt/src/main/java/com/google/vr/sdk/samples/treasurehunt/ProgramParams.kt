@@ -1,6 +1,6 @@
 package com.google.vr.sdk.samples.treasurehunt
 
-import ru.simlabs.glwrapper.Program
+import ru.vasily_knk.glwrapper.Program
 
 class CubeParams(cubeProgram: Program) {
     val position            = cubeProgram.getAttribLocation("a_Position")

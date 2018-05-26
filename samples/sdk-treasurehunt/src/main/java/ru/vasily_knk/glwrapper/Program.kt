@@ -1,10 +1,8 @@
-package ru.simlabs.glwrapper
+package ru.vasily_knk.glwrapper
 
 import android.opengl.GLES20
 import android.util.Log
 
-import org.joml.Vector3f
-import org.joml.Vector3fc
 
 class Program(vertexShaderCode: String, fragmentShaderCode: String) {
     val id = initProgram(vertexShaderCode, fragmentShaderCode)
