@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion 26
@@ -37,4 +38,13 @@ android {
 dependencies {
     compile 'com.google.vr:sdk-audio:1.140.0'
     compile 'com.google.vr:sdk-base:1.140.0'
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    compile 'org.joml:joml:1.9.3-SNAPSHOT'
 }
+repositories {
+    mavenCentral()
+    maven {
+        url "https://oss.sonatype.org/content/repositories/snapshots/"
+    }
+}
+

@@ -38,6 +38,8 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 
+import ru.simlabs.glwrapper.Program;
+
 /**
  * A Google VR sample application.
  *
@@ -89,24 +91,11 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private FloatBuffer cubeFoundColors;
   private FloatBuffer cubeNormals;
 
-  private int cubeProgram;
-  private int floorProgram;
-
-  private int cubePositionParam;
-  private int cubeNormalParam;
-  private int cubeColorParam;
-  private int cubeModelParam;
-  private int cubeModelViewParam;
-  private int cubeModelViewProjectionParam;
-  private int cubeLightPosParam;
-
-  private int floorPositionParam;
-  private int floorNormalParam;
-  private int floorColorParam;
-  private int floorModelParam;
-  private int floorModelViewParam;
-  private int floorModelViewProjectionParam;
-  private int floorLightPosParam;
+  private Program cubeProgram;
+  private Program floorProgram;
+  
+  CubeParams cubeParams;
+  FloorParams floorParams;
 
   private float[] camera;
   private float[] view;
@@ -128,37 +117,6 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private volatile int successSourceId = GvrAudioEngine.INVALID_ID;
 
   /**
-   * Converts a raw text file, saved as a resource, into an OpenGL ES shader.
-   *
-   * @param type The type of shader we will be creating.
-   * @param resId The resource ID of the raw text file about to be turned into a shader.
-   * @return The shader object handler.
-   */
-  private int loadGLShader(int type, int resId) {
-    String code = readRawTextFile(resId);
-    int shader = GLES20.glCreateShader(type);
-    GLES20.glShaderSource(shader, code);
-    GLES20.glCompileShader(shader);
-
-    // Get the compilation status.
-    final int[] compileStatus = new int[1];
-    GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0);
-
-    // If the compilation failed, delete the shader.
-    if (compileStatus[0] == 0) {
-      Log.e(TAG, "Error compiling shader: " + GLES20.glGetShaderInfoLog(shader));
-      GLES20.glDeleteShader(shader);
-      shader = 0;
-    }
-
-    if (shader == 0) {
-      throw new RuntimeException("Error creating shader.");
-    }
-
-    return shader;
-  }
-
-  /**
    * Checks if we've had an error inside of OpenGL ES, and if so what that error is.
    *
    * @param label Label to report in case of error.
@@ -178,6 +136,8 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   @Override
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+
+
 
     initializeGvrView();
 
@@ -300,45 +260,25 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     floorColors.put(WorldLayoutData.FLOOR_COLORS);
     floorColors.position(0);
 
-    int vertexShader = loadGLShader(GLES20.GL_VERTEX_SHADER, R.raw.light_vertex);
-    int gridShader = loadGLShader(GLES20.GL_FRAGMENT_SHADER, R.raw.grid_fragment);
-    int passthroughShader = loadGLShader(GLES20.GL_FRAGMENT_SHADER, R.raw.passthrough_fragment);
+    cubeProgram = new Program(readRawTextFile(R.raw.light_vertex),
+            readRawTextFile(R.raw.passthrough_fragment));
 
-    cubeProgram = GLES20.glCreateProgram();
-    GLES20.glAttachShader(cubeProgram, vertexShader);
-    GLES20.glAttachShader(cubeProgram, passthroughShader);
-    GLES20.glLinkProgram(cubeProgram);
-    GLES20.glUseProgram(cubeProgram);
+    cubeProgram.use();
 
     checkGLError("Cube program");
 
-    cubePositionParam = GLES20.glGetAttribLocation(cubeProgram, "a_Position");
-    cubeNormalParam = GLES20.glGetAttribLocation(cubeProgram, "a_Normal");
-    cubeColorParam = GLES20.glGetAttribLocation(cubeProgram, "a_Color");
-
-    cubeModelParam = GLES20.glGetUniformLocation(cubeProgram, "u_Model");
-    cubeModelViewParam = GLES20.glGetUniformLocation(cubeProgram, "u_MVMatrix");
-    cubeModelViewProjectionParam = GLES20.glGetUniformLocation(cubeProgram, "u_MVP");
-    cubeLightPosParam = GLES20.glGetUniformLocation(cubeProgram, "u_LightPos");
+    cubeParams = new CubeParams(cubeProgram);
 
     checkGLError("Cube program params");
 
-    floorProgram = GLES20.glCreateProgram();
-    GLES20.glAttachShader(floorProgram, vertexShader);
-    GLES20.glAttachShader(floorProgram, gridShader);
-    GLES20.glLinkProgram(floorProgram);
-    GLES20.glUseProgram(floorProgram);
+    floorProgram = new Program(readRawTextFile(R.raw.light_vertex),
+            readRawTextFile(R.raw.grid_fragment));
 
+    cubeProgram.use();
+    
     checkGLError("Floor program");
-
-    floorModelParam = GLES20.glGetUniformLocation(floorProgram, "u_Model");
-    floorModelViewParam = GLES20.glGetUniformLocation(floorProgram, "u_MVMatrix");
-    floorModelViewProjectionParam = GLES20.glGetUniformLocation(floorProgram, "u_MVP");
-    floorLightPosParam = GLES20.glGetUniformLocation(floorProgram, "u_LightPos");
-
-    floorPositionParam = GLES20.glGetAttribLocation(floorProgram, "a_Position");
-    floorNormalParam = GLES20.glGetAttribLocation(floorProgram, "a_Normal");
-    floorColorParam = GLES20.glGetAttribLocation(floorProgram, "a_Color");
+    
+    floorParams = new FloorParams(floorProgram);
 
     checkGLError("Floor program params");
 
@@ -346,23 +286,26 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     Matrix.translateM(modelFloor, 0, 0, -floorDepth, 0); // Floor appears below user.
 
     // Avoid any delays during start-up due to decoding of sound files.
-    new Thread(
-            new Runnable() {
-              @Override
-              public void run() {
-                // Start spatial audio playback of OBJECT_SOUND_FILE at the model position. The
-                // returned sourceId handle is stored and allows for repositioning the sound object
-                // whenever the cube position changes.
-                gvrAudioEngine.preloadSoundFile(OBJECT_SOUND_FILE);
-                sourceId = gvrAudioEngine.createSoundObject(OBJECT_SOUND_FILE);
-                gvrAudioEngine.setSoundObjectPosition(
-                    sourceId, modelPosition[0], modelPosition[1], modelPosition[2]);
-                gvrAudioEngine.playSound(sourceId, true /* looped playback */);
-                // Preload an unspatialized sound to be played on a successful trigger on the cube.
-                gvrAudioEngine.preloadSoundFile(SUCCESS_SOUND_FILE);
-              }
-            })
-        .start();
+    if (false)
+    {
+      new Thread(
+              new Runnable() {
+                @Override
+                public void run() {
+                  // Start spatial audio playback of OBJECT_SOUND_FILE at the model position. The
+                  // returned sourceId handle is stored and allows for repositioning the sound object
+                  // whenever the cube position changes.
+                  gvrAudioEngine.preloadSoundFile(OBJECT_SOUND_FILE);
+                  sourceId = gvrAudioEngine.createSoundObject(OBJECT_SOUND_FILE);
+                  gvrAudioEngine.setSoundObjectPosition(
+                          sourceId, modelPosition[0], modelPosition[1], modelPosition[2]);
+                  gvrAudioEngine.playSound(sourceId, true /* looped playback */);
+                  // Preload an unspatialized sound to be played on a successful trigger on the cube.
+                  gvrAudioEngine.preloadSoundFile(SUCCESS_SOUND_FILE);
+                }
+              })
+              .start();
+    }
 
     updateModelPosition();
 
@@ -475,39 +418,39 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
    * <p>We've set all of our transformation matrices. Now we simply pass them into the shader.
    */
   public void drawCube() {
-    GLES20.glUseProgram(cubeProgram);
+    cubeProgram.use();
 
-    GLES20.glUniform3fv(cubeLightPosParam, 1, lightPosInEyeSpace, 0);
+    GLES20.glUniform3fv(cubeParams.getLightPos(), 1, lightPosInEyeSpace, 0);
 
     // Set the Model in the shader, used to calculate lighting
-    GLES20.glUniformMatrix4fv(cubeModelParam, 1, false, modelCube, 0);
+    GLES20.glUniformMatrix4fv(cubeParams.getModel(), 1, false, modelCube, 0);
 
     // Set the ModelView in the shader, used to calculate lighting
-    GLES20.glUniformMatrix4fv(cubeModelViewParam, 1, false, modelView, 0);
+    GLES20.glUniformMatrix4fv(cubeParams.getModelView(), 1, false, modelView, 0);
 
     // Set the position of the cube
     GLES20.glVertexAttribPointer(
-        cubePositionParam, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, cubeVertices);
+        cubeParams.getPosition(), COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, cubeVertices);
 
     // Set the ModelViewProjection matrix in the shader.
-    GLES20.glUniformMatrix4fv(cubeModelViewProjectionParam, 1, false, modelViewProjection, 0);
+    GLES20.glUniformMatrix4fv(cubeParams.getModelViewProjection(), 1, false, modelViewProjection, 0);
 
     // Set the normal positions of the cube, again for shading
-    GLES20.glVertexAttribPointer(cubeNormalParam, 3, GLES20.GL_FLOAT, false, 0, cubeNormals);
-    GLES20.glVertexAttribPointer(cubeColorParam, 4, GLES20.GL_FLOAT, false, 0,
+    GLES20.glVertexAttribPointer(cubeParams.getNormal(), 3, GLES20.GL_FLOAT, false, 0, cubeNormals);
+    GLES20.glVertexAttribPointer(cubeParams.getColor(), 4, GLES20.GL_FLOAT, false, 0,
         isLookingAtObject() ? cubeFoundColors : cubeColors);
 
     // Enable vertex arrays
-    GLES20.glEnableVertexAttribArray(cubePositionParam);
-    GLES20.glEnableVertexAttribArray(cubeNormalParam);
-    GLES20.glEnableVertexAttribArray(cubeColorParam);
+    GLES20.glEnableVertexAttribArray(cubeParams.getPosition());
+    GLES20.glEnableVertexAttribArray(cubeParams.getNormal());
+    GLES20.glEnableVertexAttribArray(cubeParams.getColor());
 
     GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
 
     // Disable vertex arrays
-    GLES20.glDisableVertexAttribArray(cubePositionParam);
-    GLES20.glDisableVertexAttribArray(cubeNormalParam);
-    GLES20.glDisableVertexAttribArray(cubeColorParam);
+    GLES20.glDisableVertexAttribArray(cubeParams.getPosition());
+    GLES20.glDisableVertexAttribArray(cubeParams.getNormal());
+    GLES20.glDisableVertexAttribArray(cubeParams.getColor());
     
     checkGLError("Drawing cube");
   }
@@ -520,27 +463,27 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
    * look strange.
    */
   public void drawFloor() {
-    GLES20.glUseProgram(floorProgram);
+    floorProgram.use();
 
     // Set ModelView, MVP, position, normals, and color.
-    GLES20.glUniform3fv(floorLightPosParam, 1, lightPosInEyeSpace, 0);
-    GLES20.glUniformMatrix4fv(floorModelParam, 1, false, modelFloor, 0);
-    GLES20.glUniformMatrix4fv(floorModelViewParam, 1, false, modelView, 0);
-    GLES20.glUniformMatrix4fv(floorModelViewProjectionParam, 1, false, modelViewProjection, 0);
+    GLES20.glUniform3fv(floorParams.getLightPos(), 1, lightPosInEyeSpace, 0);
+    GLES20.glUniformMatrix4fv(floorParams.getModel(), 1, false, modelFloor, 0);
+    GLES20.glUniformMatrix4fv(floorParams.getModelView(), 1, false, modelView, 0);
+    GLES20.glUniformMatrix4fv(floorParams.getModelViewProjection(), 1, false, modelViewProjection, 0);
     GLES20.glVertexAttribPointer(
-        floorPositionParam, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, floorVertices);
-    GLES20.glVertexAttribPointer(floorNormalParam, 3, GLES20.GL_FLOAT, false, 0, floorNormals);
-    GLES20.glVertexAttribPointer(floorColorParam, 4, GLES20.GL_FLOAT, false, 0, floorColors);
+        floorParams.getPosition(), COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, floorVertices);
+    GLES20.glVertexAttribPointer(floorParams.getNormal(), 3, GLES20.GL_FLOAT, false, 0, floorNormals);
+    GLES20.glVertexAttribPointer(floorParams.getColor(), 4, GLES20.GL_FLOAT, false, 0, floorColors);
 
-    GLES20.glEnableVertexAttribArray(floorPositionParam);
-    GLES20.glEnableVertexAttribArray(floorNormalParam);
-    GLES20.glEnableVertexAttribArray(floorColorParam);
+    GLES20.glEnableVertexAttribArray(floorParams.getPosition());
+    GLES20.glEnableVertexAttribArray(floorParams.getNormal());
+    GLES20.glEnableVertexAttribArray(floorParams.getColor());
 
     GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 24);
 
-    GLES20.glDisableVertexAttribArray(floorPositionParam);
-    GLES20.glDisableVertexAttribArray(floorNormalParam);
-    GLES20.glDisableVertexAttribArray(floorColorParam);
+    GLES20.glDisableVertexAttribArray(floorParams.getPosition());
+    GLES20.glDisableVertexAttribArray(floorParams.getNormal());
+    GLES20.glDisableVertexAttribArray(floorParams.getColor());
 
     checkGLError("drawing floor");
   }
