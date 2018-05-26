@@ -1,11 +1,10 @@
-package ru.vasily_knk.glwrapper
+package ru.vasilyknk.glwrapper
 
 import android.opengl.GLES20
 import android.util.Log
 
-
-class Program(vertexShaderCode: String, fragmentShaderCode: String) {
-    val id = initProgram(vertexShaderCode, fragmentShaderCode)
+class Program internal constructor(vertexShaderCode: String, fragmentShaderCode: String) : AutoCloseable {
+    private val id: Int = initProgram(vertexShaderCode, fragmentShaderCode)
 
     fun use() {
         GLES20.glUseProgram(id)
@@ -13,6 +12,9 @@ class Program(vertexShaderCode: String, fragmentShaderCode: String) {
 
     fun getAttribLocation(name: String) = GLES20.glGetAttribLocation(id, name)
     fun getUniformLocation(name: String) = GLES20.glGetUniformLocation(id, name)
+
+    override fun close() {
+    }
 }
 
 private fun initProgram(vertexShaderCode: String, fragmentShaderCode: String): Int {

@@ -1,12 +1,14 @@
-package ru.vasily_knk.glwrapper
+package ru.vasilyknk.glwrapper
 
 import android.opengl.GLES20
 import org.joml.Matrix4fc
 import org.joml.Vector3fc
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 class Uniforms {
-    private val floatBuffer = FloatBuffer.allocate(1024)
+    private val floatBuffer = allocateFloatBuffer()
 
     fun set(index: Int, vec: Vector3fc) {
         vec.get(floatBuffer)
@@ -19,4 +21,9 @@ class Uniforms {
     }
 }
 
+private fun allocateFloatBuffer(): FloatBuffer {
+    val bb = ByteBuffer.allocateDirect(1024 * 4)
+    bb.order(ByteOrder.nativeOrder())
+    return bb.asFloatBuffer()
+}
 

@@ -38,8 +38,8 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 
-import ru.vasily_knk.glwrapper.Program;
-import ru.vasily_knk.glwrapper.Uniforms;
+import ru.vasilyknk.glwrapper.Program;
+import ru.vasilyknk.glwrapper.Uniforms;
 
 /**
  * A Google VR sample application.
@@ -262,8 +262,8 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     floorColors.put(WorldLayoutData.FLOOR_COLORS);
     floorColors.position(0);
 
-    cubeProgram = new Program(readRawTextFile(R.raw.light_vertex),
-            readRawTextFile(R.raw.passthrough_fragment));
+    cubeProgram = new Program(readRawTextFileUnsafe(R.raw.light_vertex),
+            readRawTextFileUnsafe(R.raw.passthrough_fragment));
 
     cubeProgram.use();
 
@@ -273,8 +273,8 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
 
     checkGLError("Cube program params");
 
-    floorProgram = new Program(readRawTextFile(R.raw.light_vertex),
-            readRawTextFile(R.raw.grid_fragment));
+    floorProgram = new Program(readRawTextFileUnsafe(R.raw.light_vertex),
+            readRawTextFileUnsafe(R.raw.grid_fragment));
 
     cubeProgram.use();
     
@@ -350,6 +350,14 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
       Log.e(TAG, "Failed to load text file: " + e);
     }
     return null;
+  }
+
+  private String readRawTextFileUnsafe(int resId) {
+    String str = readRawTextFile(resId);
+    if (str == null)
+      throw new RuntimeException("Can't read raw text file " + resId);
+
+    return str;
   }
 
   /**
