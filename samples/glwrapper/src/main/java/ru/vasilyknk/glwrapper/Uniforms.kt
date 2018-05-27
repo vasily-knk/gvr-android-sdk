@@ -7,8 +7,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
-class Uniforms {
-    private val floatBuffer = allocateFloatBuffer()
+class Uniforms internal constructor(capacity: Int) {
+    private val floatBuffer = allocateFloatBuffer(capacity)
 
     fun set(index: Int, vec: Vector3fc) {
         vec.get(floatBuffer)
@@ -21,8 +21,8 @@ class Uniforms {
     }
 }
 
-private fun allocateFloatBuffer(): FloatBuffer {
-    val bb = ByteBuffer.allocateDirect(1024 * 4)
+private fun allocateFloatBuffer(capacity: Int): FloatBuffer {
+    val bb = ByteBuffer.allocateDirect(capacity)
     bb.order(ByteOrder.nativeOrder())
     return bb.asFloatBuffer()
 }

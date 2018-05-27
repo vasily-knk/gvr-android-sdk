@@ -3,10 +3,6 @@ package com.google.vr.sdk.samples.treasurehunt
 import ru.vasilyknk.glwrapper.Program
 
 class CubeParams(cubeProgram: Program) {
-    val position            = cubeProgram.getAttribLocation("a_Position")
-    val normal              = cubeProgram.getAttribLocation("a_Normal")
-    val color               = cubeProgram.getAttribLocation("a_Color")
-
     val model               = cubeProgram.getUniformLocation("u_Model")
     val modelView           = cubeProgram.getUniformLocation("u_MVMatrix")
     val modelViewProjection = cubeProgram.getUniformLocation("u_MVP")

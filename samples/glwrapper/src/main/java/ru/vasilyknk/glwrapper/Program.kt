@@ -13,7 +13,7 @@ class Program internal constructor(vertexShaderCode: String, fragmentShaderCode:
     fun getAttribLocation(name: String) = GLES20.glGetAttribLocation(checkedId(), name)
     fun getUniformLocation(name: String) = GLES20.glGetUniformLocation(checkedId(), name)
 
-    override fun free() {
+    override fun close() {
         val checkedId = id ?: return
         GLES20.glDeleteProgram(checkedId)
     }
@@ -25,8 +25,10 @@ class Program internal constructor(vertexShaderCode: String, fragmentShaderCode:
     }
 }
 
+
 private fun initProgram(vertexShaderCode: String, fragmentShaderCode: String): Int {
     val id = GLES20.glCreateProgram()
+
     GLES20.glAttachShader(id, loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode))
     GLES20.glAttachShader(id, loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode))
     GLES20.glLinkProgram(id)

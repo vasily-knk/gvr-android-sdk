@@ -33,13 +33,17 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 
+import ru.vasilyknk.glwrapper.Engine;
 import ru.vasilyknk.glwrapper.Program;
-import ru.vasilyknk.glwrapper.Uniforms;
+import ru.vasilyknk.glwrapper.ResourceHolder;
+import ru.vasilyknk.glwrapper.VertexArrayObject;
+import ru.vasilyknk.glwrapper.VertexAttrib;
 
 /**
  * A Google VR sample application.
@@ -87,15 +91,15 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private FloatBuffer floorColors;
   private FloatBuffer floorNormals;
 
-  private FloatBuffer cubeVertices;
-  private FloatBuffer cubeColors;
-  private FloatBuffer cubeFoundColors;
-  private FloatBuffer cubeNormals;
+  private Engine engine = new Engine();
+  private ResourceHolder rh = new ResourceHolder();
 
-  private Uniforms uniforms = new Uniforms();
   private Program cubeProgram;
   private Program floorProgram;
-  
+
+  private VertexArrayObject cubeVAO, cubeFoundVAO;
+  private VertexArrayObject floorVAO;
+
   CubeParams cubeParams;
   FloorParams floorParams;
 
@@ -198,6 +202,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   @Override
   public void onRendererShutdown() {
     Log.i(TAG, "onRendererShutdown");
+    rh.close();
   }
 
   @Override
@@ -218,30 +223,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     Log.i(TAG, "onSurfaceCreated");
     GLES20.glClearColor(0.1f, 0.1f, 0.1f, 0.5f); // Dark background so text shows up well.
 
-    ByteBuffer bbVertices = ByteBuffer.allocateDirect(WorldLayoutData.CUBE_COORDS.length * 4);
-    bbVertices.order(ByteOrder.nativeOrder());
-    cubeVertices = bbVertices.asFloatBuffer();
-    cubeVertices.put(WorldLayoutData.CUBE_COORDS);
-    cubeVertices.position(0);
-
-    ByteBuffer bbColors = ByteBuffer.allocateDirect(WorldLayoutData.CUBE_COLORS.length * 4);
-    bbColors.order(ByteOrder.nativeOrder());
-    cubeColors = bbColors.asFloatBuffer();
-    cubeColors.put(WorldLayoutData.CUBE_COLORS);
-    cubeColors.position(0);
-
-    ByteBuffer bbFoundColors =
-        ByteBuffer.allocateDirect(WorldLayoutData.CUBE_FOUND_COLORS.length * 4);
-    bbFoundColors.order(ByteOrder.nativeOrder());
-    cubeFoundColors = bbFoundColors.asFloatBuffer();
-    cubeFoundColors.put(WorldLayoutData.CUBE_FOUND_COLORS);
-    cubeFoundColors.position(0);
-
-    ByteBuffer bbNormals = ByteBuffer.allocateDirect(WorldLayoutData.CUBE_NORMALS.length * 4);
-    bbNormals.order(ByteOrder.nativeOrder());
-    cubeNormals = bbNormals.asFloatBuffer();
-    cubeNormals.put(WorldLayoutData.CUBE_NORMALS);
-    cubeNormals.position(0);
+    initCube();
 
     // make a floor
     ByteBuffer bbFloorVertices = ByteBuffer.allocateDirect(WorldLayoutData.FLOOR_COORDS.length * 4);
@@ -262,18 +244,9 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     floorColors.put(WorldLayoutData.FLOOR_COLORS);
     floorColors.position(0);
 
-    cubeProgram = new Program(readRawTextFileUnsafe(R.raw.light_vertex),
-            readRawTextFileUnsafe(R.raw.passthrough_fragment));
-
-    cubeProgram.use();
-
-    checkGLError("Cube program");
-
-    cubeParams = new CubeParams(cubeProgram);
-
     checkGLError("Cube program params");
 
-    floorProgram = new Program(readRawTextFileUnsafe(R.raw.light_vertex),
+    floorProgram = rh.createProgram(readRawTextFileUnsafe(R.raw.light_vertex),
             readRawTextFileUnsafe(R.raw.grid_fragment));
 
     cubeProgram.use();
@@ -312,6 +285,55 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     updateModelPosition();
 
     checkGLError("onSurfaceCreated");
+  }
+
+  private FloatBuffer createFloatBuffer(float[] data) {
+    ByteBuffer bb = ByteBuffer.allocateDirect(data.length * 4);
+    bb.order(ByteOrder.nativeOrder());
+
+
+    FloatBuffer fb = bb.asFloatBuffer();
+    fb.put(data);
+    fb.position(0);
+
+    return fb;
+  }
+
+  private void initCube() {
+    Buffer cubeVertices    = createFloatBuffer(WorldLayoutData.CUBE_COORDS      );
+    Buffer cubeColors      = createFloatBuffer(WorldLayoutData.CUBE_COLORS      );
+    Buffer cubeFoundColors = createFloatBuffer(WorldLayoutData.CUBE_FOUND_COLORS);
+    Buffer cubeNormals     = createFloatBuffer(WorldLayoutData.CUBE_NORMALS     );
+
+    cubeProgram = rh.createProgram(readRawTextFileUnsafe(R.raw.light_vertex),
+            readRawTextFileUnsafe(R.raw.passthrough_fragment));
+
+    cubeProgram.use();
+    checkGLError("Cube program");
+
+    int positionIndex = cubeProgram.getAttribLocation("a_Position");
+    int normalIndex   = cubeProgram.getAttribLocation("a_Normal"  );
+    int colorIndex    = cubeProgram.getAttribLocation("a_Color"   );
+
+    VertexAttrib[] attribs = {
+        new VertexAttrib(positionIndex, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, 0),
+        new VertexAttrib(normalIndex  , 3           , GLES20.GL_FLOAT, false, 0, 1),
+        new VertexAttrib(colorIndex   , 4           , GLES20.GL_FLOAT, false, 0, 2),
+    };
+
+    cubeVAO = new VertexArrayObject(attribs, new Buffer[] {
+            cubeVertices   ,
+            cubeNormals    ,
+            cubeColors     ,
+    });
+
+    cubeFoundVAO = new VertexArrayObject(attribs, new Buffer[] {
+            cubeVertices   ,
+            cubeNormals    ,
+            cubeFoundColors,
+    });
+
+    cubeParams = new CubeParams(cubeProgram);
   }
 
   /**
@@ -438,31 +460,17 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     // Set the ModelView in the shader, used to calculate lighting
     GLES20.glUniformMatrix4fv(cubeParams.getModelView(), 1, false, modelView, 0);
 
-    // Set the position of the cube
-    GLES20.glVertexAttribPointer(
-        cubeParams.getPosition(), COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, cubeVertices);
-
     // Set the ModelViewProjection matrix in the shader.
     GLES20.glUniformMatrix4fv(cubeParams.getModelViewProjection(), 1, false, modelViewProjection, 0);
 
-    // Set the normal positions of the cube, again for shading
-    GLES20.glVertexAttribPointer(cubeParams.getNormal(), 3, GLES20.GL_FLOAT, false, 0, cubeNormals);
-    GLES20.glVertexAttribPointer(cubeParams.getColor(), 4, GLES20.GL_FLOAT, false, 0,
-        isLookingAtObject() ? cubeFoundColors : cubeColors);
-
-    // Enable vertex arrays
-    GLES20.glEnableVertexAttribArray(cubeParams.getPosition());
-    GLES20.glEnableVertexAttribArray(cubeParams.getNormal());
-    GLES20.glEnableVertexAttribArray(cubeParams.getColor());
-
-    GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
-
-    // Disable vertex arrays
-    GLES20.glDisableVertexAttribArray(cubeParams.getPosition());
-    GLES20.glDisableVertexAttribArray(cubeParams.getNormal());
-    GLES20.glDisableVertexAttribArray(cubeParams.getColor());
+    VertexArrayObject vao = isLookingAtObject() ? cubeFoundVAO : cubeVAO;
     
+    vao.use();
+    GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+    vao.unUse();
+
     checkGLError("Drawing cube");
+
   }
 
   /**

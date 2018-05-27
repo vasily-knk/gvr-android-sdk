@@ -1,7 +1,6 @@
 package ru.vasilyknk.glwrapper
 
-interface Resource {
-    fun free()
+interface Resource : AutoCloseable {
     fun isValid(): Boolean
 }
 
