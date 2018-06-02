@@ -39,6 +39,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 
+import ru.vasilyknk.glwrapper.BufferObject;
 import ru.vasilyknk.glwrapper.Engine;
 import ru.vasilyknk.glwrapper.Program;
 import ru.vasilyknk.glwrapper.ResourceHolder;
@@ -224,38 +225,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     GLES20.glClearColor(0.1f, 0.1f, 0.1f, 0.5f); // Dark background so text shows up well.
 
     initCube();
-
-    // make a floor
-    ByteBuffer bbFloorVertices = ByteBuffer.allocateDirect(WorldLayoutData.FLOOR_COORDS.length * 4);
-    bbFloorVertices.order(ByteOrder.nativeOrder());
-    floorVertices = bbFloorVertices.asFloatBuffer();
-    floorVertices.put(WorldLayoutData.FLOOR_COORDS);
-    floorVertices.position(0);
-
-    ByteBuffer bbFloorNormals = ByteBuffer.allocateDirect(WorldLayoutData.FLOOR_NORMALS.length * 4);
-    bbFloorNormals.order(ByteOrder.nativeOrder());
-    floorNormals = bbFloorNormals.asFloatBuffer();
-    floorNormals.put(WorldLayoutData.FLOOR_NORMALS);
-    floorNormals.position(0);
-
-    ByteBuffer bbFloorColors = ByteBuffer.allocateDirect(WorldLayoutData.FLOOR_COLORS.length * 4);
-    bbFloorColors.order(ByteOrder.nativeOrder());
-    floorColors = bbFloorColors.asFloatBuffer();
-    floorColors.put(WorldLayoutData.FLOOR_COLORS);
-    floorColors.position(0);
-
-    checkGLError("Cube program params");
-
-    floorProgram = rh.createProgram(readRawTextFileUnsafe(R.raw.light_vertex),
-            readRawTextFileUnsafe(R.raw.grid_fragment));
-
-    cubeProgram.use();
-    
-    checkGLError("Floor program");
-    
-    floorParams = new FloorParams(floorProgram);
-
-    checkGLError("Floor program params");
+    initFloor();
 
     Matrix.setIdentityM(modelFloor, 0);
     Matrix.translateM(modelFloor, 0, 0, -floorDepth, 0); // Floor appears below user.
@@ -287,25 +257,29 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     checkGLError("onSurfaceCreated");
   }
 
-  private FloatBuffer createFloatBuffer(float[] data) {
+  private BufferObject createFloatBuffer(float[] data) {
     ByteBuffer bb = ByteBuffer.allocateDirect(data.length * 4);
     bb.order(ByteOrder.nativeOrder());
-
 
     FloatBuffer fb = bb.asFloatBuffer();
     fb.put(data);
     fb.position(0);
 
-    return fb;
+    BufferObject bo = rh.createBufferObject(GLES20.GL_ARRAY_BUFFER);
+    bo.setData(fb, data.length * 4, GLES20.GL_STATIC_DRAW);
+
+    return bo;
   }
 
   private void initCube() {
-    Buffer cubeVertices    = createFloatBuffer(WorldLayoutData.CUBE_COORDS      );
-    Buffer cubeColors      = createFloatBuffer(WorldLayoutData.CUBE_COLORS      );
-    Buffer cubeFoundColors = createFloatBuffer(WorldLayoutData.CUBE_FOUND_COLORS);
-    Buffer cubeNormals     = createFloatBuffer(WorldLayoutData.CUBE_NORMALS     );
+    BufferObject cubeVertices    = createFloatBuffer(WorldLayoutData.CUBE_COORDS      );
+    BufferObject cubeColors      = createFloatBuffer(WorldLayoutData.CUBE_COLORS      );
+    BufferObject cubeFoundColors = createFloatBuffer(WorldLayoutData.CUBE_FOUND_COLORS);
+    BufferObject cubeNormals     = createFloatBuffer(WorldLayoutData.CUBE_NORMALS     );
 
-    cubeProgram = rh.createProgram(readRawTextFileUnsafe(R.raw.light_vertex),
+    cubeProgram = rh.createProgram();
+
+    cubeProgram.init(readRawTextFileUnsafe(R.raw.light_vertex),
             readRawTextFileUnsafe(R.raw.passthrough_fragment));
 
     cubeProgram.use();
@@ -321,13 +295,13 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
         new VertexAttrib(colorIndex   , 4           , GLES20.GL_FLOAT, false, 0, 2),
     };
 
-    cubeVAO = new VertexArrayObject(attribs, new Buffer[] {
+    cubeVAO = new VertexArrayObject(attribs, new BufferObject[] {
             cubeVertices   ,
             cubeNormals    ,
             cubeColors     ,
     });
 
-    cubeFoundVAO = new VertexArrayObject(attribs, new Buffer[] {
+    cubeFoundVAO = new VertexArrayObject(attribs, new BufferObject[] {
             cubeVertices   ,
             cubeNormals    ,
             cubeFoundColors,
@@ -335,6 +309,41 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
 
     cubeParams = new CubeParams(cubeProgram);
   }
+
+  private void initFloor() {
+    BufferObject floorVertices = createFloatBuffer(WorldLayoutData.FLOOR_COORDS );
+    BufferObject floorNormals  = createFloatBuffer(WorldLayoutData.FLOOR_NORMALS);
+    BufferObject floorColors   = createFloatBuffer(WorldLayoutData.FLOOR_COLORS );
+
+
+    floorProgram = rh.createProgram();
+
+    floorProgram.init(readRawTextFileUnsafe(R.raw.light_vertex),
+            readRawTextFileUnsafe(R.raw.grid_fragment));
+
+    floorProgram.use();
+    checkGLError("Floor program");
+
+
+    int positionIndex = floorProgram.getAttribLocation("a_Position");
+    int normalIndex   = floorProgram.getAttribLocation("a_Normal");
+    int colorIndex    = floorProgram.getAttribLocation("a_Color");
+
+    VertexAttrib[] attribs = {
+            new VertexAttrib(positionIndex, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, 0),
+            new VertexAttrib(normalIndex  , 3           , GLES20.GL_FLOAT, false, 0, 1),
+            new VertexAttrib(colorIndex   , 4           , GLES20.GL_FLOAT, false, 0, 2),
+    };
+
+    floorVAO = new VertexArrayObject(attribs, new BufferObject[] {
+            floorVertices,
+            floorNormals,
+            floorColors,
+    });
+
+    floorParams = new FloorParams(floorProgram);
+  }
+
 
   /**
    * Updates the cube model position.
@@ -488,20 +497,12 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     GLES20.glUniformMatrix4fv(floorParams.getModel(), 1, false, modelFloor, 0);
     GLES20.glUniformMatrix4fv(floorParams.getModelView(), 1, false, modelView, 0);
     GLES20.glUniformMatrix4fv(floorParams.getModelViewProjection(), 1, false, modelViewProjection, 0);
-    GLES20.glVertexAttribPointer(
-        floorParams.getPosition(), COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, floorVertices);
-    GLES20.glVertexAttribPointer(floorParams.getNormal(), 3, GLES20.GL_FLOAT, false, 0, floorNormals);
-    GLES20.glVertexAttribPointer(floorParams.getColor(), 4, GLES20.GL_FLOAT, false, 0, floorColors);
 
-    GLES20.glEnableVertexAttribArray(floorParams.getPosition());
-    GLES20.glEnableVertexAttribArray(floorParams.getNormal());
-    GLES20.glEnableVertexAttribArray(floorParams.getColor());
+    VertexArrayObject vao = floorVAO;
 
+    vao.use();
     GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 24);
-
-    GLES20.glDisableVertexAttribArray(floorParams.getPosition());
-    GLES20.glDisableVertexAttribArray(floorParams.getNormal());
-    GLES20.glDisableVertexAttribArray(floorParams.getColor());
+    vao.unUse();
 
     checkGLError("drawing floor");
   }

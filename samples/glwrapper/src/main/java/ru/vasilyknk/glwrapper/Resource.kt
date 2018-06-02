@@ -4,3 +4,4 @@ interface Resource : AutoCloseable {
     fun isValid(): Boolean
 }
 
+

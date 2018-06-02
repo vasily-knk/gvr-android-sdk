@@ -1,40 +1,36 @@
 package ru.vasilyknk.glwrapper
 
 import android.opengl.GLES20
+import android.opengl.GLES30
 import android.util.Log
 
-class Program internal constructor(vertexShaderCode: String, fragmentShaderCode: String) : Resource {
-    private var id: Int? = initProgram(vertexShaderCode, fragmentShaderCode)
+class Program : Resource {
+    private val id = ResourceId(null)
+
+    fun init(vertexShaderCode: String, fragmentShaderCode: String) {
+        val newId = GLES20.glCreateProgram()
+
+        GLES20.glAttachShader(newId, loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode))
+        GLES20.glAttachShader(newId, loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode))
+        GLES20.glLinkProgram(newId)
+        GLES20.glUseProgram(newId)
+
+        id.set(newId)
+    }
 
     fun use() {
-        GLES20.glUseProgram(checkedId())
+        GLES20.glUseProgram(id.get())
     }
 
-    fun getAttribLocation(name: String) = GLES20.glGetAttribLocation(checkedId(), name)
-    fun getUniformLocation(name: String) = GLES20.glGetUniformLocation(checkedId(), name)
+    fun getAttribLocation(name: String) = GLES20.glGetAttribLocation(id.get(), name)
+    fun getUniformLocation(name: String) = GLES20.glGetUniformLocation(id.get(), name)
 
     override fun close() {
-        val checkedId = id ?: return
-        GLES20.glDeleteProgram(checkedId)
+        if (id.isValid())
+            GLES20.glDeleteProgram(id.get())
     }
 
-    override fun isValid() = (id != null)
-
-    private fun checkedId(): Int {
-        return id ?: throw RuntimeException("Invalid program")
-    }
-}
-
-
-private fun initProgram(vertexShaderCode: String, fragmentShaderCode: String): Int {
-    val id = GLES20.glCreateProgram()
-
-    GLES20.glAttachShader(id, loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode))
-    GLES20.glAttachShader(id, loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode))
-    GLES20.glLinkProgram(id)
-    GLES20.glUseProgram(id)
-
-    return id
+    override fun isValid() = id.isValid()
 }
 
 private fun loadShader(type: Int, code: String): Int {

@@ -3,8 +3,8 @@ package ru.vasilyknk.glwrapper
 class ResourceHolder : AutoCloseable {
     private val resources = mutableListOf<Resource>()
 
-    fun createProgram(vertexShaderCode: String, fragmentShaderCode: String): Program
-            = addResource(Program(vertexShaderCode, fragmentShaderCode))
+    fun createProgram(): Program = addResource(Program())
+    fun createBufferObject(target: Int): BufferObject = addResource(BufferObject(target))
 
     private fun <T : Resource> addResource(res: T): T {
         resources.add(res)
