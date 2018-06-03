@@ -22,9 +22,11 @@ uniform vec3 u_LightPos;
 attribute vec4 a_Position;
 attribute vec4 a_Color;
 attribute vec3 a_Normal;
+attribute vec2 a_UV;
 
 varying vec4 v_Color;
 varying vec3 v_Grid;
+varying vec2 v_UV;
 
 void main() {
    v_Grid = vec3(u_Model * a_Position);
@@ -38,5 +40,8 @@ void main() {
 
    diffuse = diffuse * (1.0 / (1.0 + (0.00001 * distance * distance)));
    v_Color = vec4(a_Color.rgb * diffuse, a_Color.a);
+
+   v_UV = a_UV;
+
    gl_Position = u_MVP * a_Position;
 }

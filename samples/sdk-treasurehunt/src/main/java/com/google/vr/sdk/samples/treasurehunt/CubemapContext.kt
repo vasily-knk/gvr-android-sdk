@@ -1,17 +1,16 @@
 package com.google.vr.sdk.samples.treasurehunt
 
+import android.opengl.GLES30
+import org.joml.*
 import ru.vasilyknk.glwrapper.ResourceHolder
 import ru.vasilyknk.glwrapper.Uniforms
 import ru.vasilyknk.glwrapper.VertexArrayObject
 
-import org.joml.Matrix4f
-import org.joml.Matrix4fc
-import org.joml.Vector3f
 import ru.vasilyknk.glwrapper.Program
 
 interface CubemapContext {
-    fun getRH(): ResourceHolder
-    fun getUniforms(): Uniforms
+    val rh: ResourceHolder
+    val uniforms: Uniforms
     fun readRawTextFileUnsafe(resId: Int): String
     fun getCubeVAO(): VertexArrayObject
 }
@@ -39,5 +38,33 @@ class MeshProg(val prog: Program) {
     val lightPos            = prog.getUniformLocation("u_LightPos")
 }
 
+fun createCubeTexCoords(): FloatArray {
+    val numVerts = WorldLayoutData.CUBE_COORDS.size / 3
 
+    fun extractVector3f(arr: FloatArray, offset: Int) = Vector3f(arr[offset + 0], arr[offset + 1], arr[offset + 2]).toImmutable()
+    fun createTangent(normal: Vector3fc): Vector3fc =
+        if (Math.abs(normal.z()) > 0.9f)
+            Vector3f(1.0f, 0.0f, 0.0f)
+        else
+            Vector3f(0.0f, 0.0f, 1.0f)
+
+    val result = FloatArray(numVerts * 2)
+
+    for (i in 0 until numVerts) {
+        val coord = extractVector3f(WorldLayoutData.CUBE_COORDS, i * 3)
+        val normal = extractVector3f(WorldLayoutData.CUBE_NORMALS, i * 3)
+
+        val tangent = createTangent(normal)
+        val binormal = Vector3f(normal).cross(tangent).normalize().toImmutable()
+
+        val uv = Vector2f(coord.dot(tangent), coord.dot(binormal))
+                .mul(0.5f)
+                .add(0.5f, 0.5f)
+
+        result[i * 2 + 0]  = uv.x
+        result[i * 2 + 1]  = uv.y
+    }
+
+    return result
+}
 
