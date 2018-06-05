@@ -43,7 +43,6 @@ import ru.vasilyknk.glwrapper.Engine;
 import ru.vasilyknk.glwrapper.Program;
 import ru.vasilyknk.glwrapper.ResourceHolder;
 import ru.vasilyknk.glwrapper.Texture;
-import ru.vasilyknk.glwrapper.Uniforms;
 import ru.vasilyknk.glwrapper.VertexArrayObject;
 import ru.vasilyknk.glwrapper.VertexAttrib;
 
@@ -98,11 +97,9 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private Engine engine = new Engine();
   private ResourceHolder rh;
 
-  private MeshProg cubeProg;
   private MeshProg floorProg;
   private MeshProg cubemapProg;
 
-  private VertexArrayObject cubeVAO, cubeFoundVAO;
   private VertexArrayObject floorVAO;
 
   private Matrix4f camera;
@@ -133,6 +130,8 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private Matrix4f tempViewMatrix = new Matrix4f();
 
   private Texture cubemapTexture;
+
+  private Cube cube;
 
 
   /**
@@ -234,7 +233,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     Log.i(TAG, "onSurfaceCreated");
     GLES20.glClearColor(0.1f, 0.1f, 0.1f, 0.5f); // Dark background so text shows up well.
 
-    initCube();
+    cube = new Cube(this);
     initFloor();
     initCubemap();
 
@@ -264,9 +263,13 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     updateModelPosition();
 
     checkGLError("onSurfaceCreated");
+
+    VertexArrayObject.Companion.unbindAll();
   }
 
-  private BufferObject createFloatBuffer(float[] data) {
+  @NotNull
+  @Override
+  public BufferObject createFloatBuffer(@NotNull float[] data) {
     ByteBuffer bb = ByteBuffer.allocateDirect(data.length * 4);
     bb.order(ByteOrder.nativeOrder());
 
@@ -278,53 +281,6 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     bo.setData(fb, data.length * 4, GLES20.GL_STATIC_DRAW);
 
     return bo;
-  }
-
-  private void initCube() {
-    int num_verts = WorldLayoutData.CUBE_COORDS.length / 3;
-
-    float[] uvs = CubemapContextKt.createCubeTexCoords();
-
-    BufferObject cubeVertices    = createFloatBuffer(WorldLayoutData.CUBE_COORDS      );
-    BufferObject cubeColors      = createFloatBuffer(WorldLayoutData.CUBE_COLORS      );
-    BufferObject cubeFoundColors = createFloatBuffer(WorldLayoutData.CUBE_FOUND_COLORS);
-    BufferObject cubeNormals     = createFloatBuffer(WorldLayoutData.CUBE_NORMALS     );
-    BufferObject cubeUVs         = createFloatBuffer(uvs);
-
-    Program cubeProgram = rh.createProgram(
-            readRawTextFileUnsafe(R.raw.light_vertex),
-            readRawTextFileUnsafe(R.raw.passthrough_fragment));
-
-    cubeProgram.use();
-    checkGLError("Cube program");
-
-    int positionIndex = cubeProgram.getAttribLocation("a_Position");
-    int normalIndex   = cubeProgram.getAttribLocation("a_Normal"  );
-    int colorIndex    = cubeProgram.getAttribLocation("a_Color"   );
-    int uvIndex       = cubeProgram.getAttribLocation("a_UV"   );
-
-    VertexAttrib[] attribs = {
-        new VertexAttrib(positionIndex, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, 0),
-        new VertexAttrib(normalIndex  , 3           , GLES20.GL_FLOAT, false, 0, 1),
-        new VertexAttrib(colorIndex   , 4           , GLES20.GL_FLOAT, false, 0, 2),
-        new VertexAttrib(uvIndex      , 2           , GLES20.GL_FLOAT, false, 0, 3),
-    };
-
-    cubeVAO = new VertexArrayObject(attribs, new BufferObject[] {
-            cubeVertices   ,
-            cubeNormals    ,
-            cubeColors     ,
-            cubeUVs        ,
-    });
-
-    cubeFoundVAO = new VertexArrayObject(attribs, new BufferObject[] {
-            cubeVertices   ,
-            cubeNormals    ,
-            cubeFoundColors,
-            cubeUVs        ,
-    });
-
-    cubeProg = new MeshProg(cubeProgram);
   }
 
   private void initFloor() {
@@ -351,7 +307,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
             new VertexAttrib(colorIndex   , 4           , GLES20.GL_FLOAT, false, 0, 2),
     };
 
-    floorVAO = new VertexArrayObject(attribs, new BufferObject[] {
+    floorVAO = rh.createVertexArrayObject(attribs, new BufferObject[] {
             floorVertices,
             floorNormals,
             floorColors,
@@ -468,14 +424,8 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
 
   @NotNull
   @Override
-  public VertexArrayObject getCubeVAO() {
-    return cubeVAO;
-  }
-
-  @NotNull
-  @Override
-  public Uniforms getUniforms() {
-    return engine.getUniforms();
+  public SceneParams getSceneParams() {
+    return sceneParams;
   }
 
   /**
@@ -538,30 +488,17 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     sceneParams.getView().transformPosition(LIGHT_POS_IN_WORLD_SPACE, sceneParams.getViewLightPos());
     sceneParams.getProj().set(eye.getPerspective(Z_NEAR, Z_FAR));
 
-    drawCube();
+    cube.render(cubeTransform);
     drawFloor();
     drawCubemap();
+
+    VertexArrayObject.Companion.unbindAll();
+
   }
 
   @Override
   public void onFinishFrame(Viewport viewport) {}
 
-  /**
-   * Draw the cube.
-   *
-   * <p>We've set all of our transformation matrices. Now we simply pass them into the shader.
-   */
-  private void drawCube() {
-    applyMeshProg(cubeProg, cubeTransform);
-
-    VertexArrayObject vao = isLookingAtObject() ? cubeFoundVAO : cubeVAO;
-
-    vao.use();
-    GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
-    //vao.unUse();
-
-    checkGLError("Drawing cube");
-  }
 
   /**
    * Draw the floor.
@@ -575,24 +512,26 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
 
     VertexArrayObject vao = floorVAO;
 
-    vao.use();
-    GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 24);
-    //vao.unUse();
+    int[] array = new int[2];
 
+    GLES30.glGetIntegerv(GLES30.GL_VERTEX_ARRAY_BINDING, array, 0);
+
+    vao.bind();
+    GLES30.glGetIntegerv(GLES30.GL_VERTEX_ARRAY_BINDING, array, 1);
+
+    GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 24);
     checkGLError("drawing floor");
   }
 
   private void drawCubemap() {
     applyMeshProg(cubemapProg, cubemapTransform);
 
-    VertexArrayObject vao = cubeVAO;
+    VertexArrayObject vao = cube.getCubeVAO();
 
     cubemapTexture.bind();
 
-    vao.use();
+    vao.bind();
     GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
-    //vao.unUse();
-
     checkGLError("drawing floor");
   }
 
@@ -681,13 +620,11 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private void applyMeshProg(MeshProg meshProg, Matrix4fc m) {
     meshParams.update(sceneParams, m);
 
-    meshProg.getProg().use();
+    Program.Usage usage = meshProg.getProg().use();
 
-    Uniforms uf = engine.getUniforms();   
-
-    uf.set(meshProg.getLightPos(), sceneParams.getViewLightPos());
-    uf.set(meshProg.getModel(), m, false);
-    uf.set(meshProg.getModelView(), meshParams.getMv(), false);
-    uf.set(meshProg.getModelViewProjection(), meshParams.getMvp(), false);
+    usage.setUniform(meshProg.getLightPos(), sceneParams.getViewLightPos());
+    usage.setUniform(meshProg.getModel(), m, false);
+    usage.setUniform(meshProg.getModelView(), meshParams.getMv(), false);
+    usage.setUniform(meshProg.getModelViewProjection(), meshParams.getMvp(), false);
   }
 }

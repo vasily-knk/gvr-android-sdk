@@ -1,13 +1,46 @@
 package ru.vasilyknk.glwrapper
 
+import android.opengl.GLES20
 import android.opengl.GLES30
 import android.util.Log
+import org.joml.Matrix4fc
+import org.joml.Vector3fc
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
 
 class Program internal constructor(vertexShaderCode: String, fragmentShaderCode: String): Resource {
     private val id = ResourceId(initProgram(vertexShaderCode, fragmentShaderCode))
 
-    fun use() {
-        GLES30.glUseProgram(id.get())
+    companion object {
+        private val floatBuffer: FloatBuffer
+        init {
+            val bb = ByteBuffer.allocateDirect(1024)
+            bb.order(ByteOrder.nativeOrder())
+            floatBuffer = bb.asFloatBuffer()
+        }
+    }
+
+    inner class Usage : AutoCloseable {
+        init {
+            GLES30.glUseProgram(id.get())
+        }
+
+        fun setUniform(index: Int, vec: Vector3fc) {
+            vec.get(floatBuffer)
+            GLES20.glUniform3fv(index, 1, floatBuffer)
+        }
+
+        fun setUniform(index: Int, matrix: Matrix4fc, transpose: Boolean) {
+            matrix.get(floatBuffer)
+            GLES20.glUniformMatrix4fv(index, 1, transpose, floatBuffer)
+        }
+
+        override fun close() {}
+    }
+
+    fun use(): Usage {
+        return Usage()
     }
 
     fun getAttribLocation(name: String) = GLES30.glGetAttribLocation(id.get(), name)

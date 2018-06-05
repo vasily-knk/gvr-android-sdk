@@ -2,18 +2,7 @@ package com.google.vr.sdk.samples.treasurehunt
 
 import android.opengl.GLES30
 import org.joml.*
-import ru.vasilyknk.glwrapper.ResourceHolder
-import ru.vasilyknk.glwrapper.Uniforms
-import ru.vasilyknk.glwrapper.VertexArrayObject
-
-import ru.vasilyknk.glwrapper.Program
-
-interface CubemapContext {
-    val rh: ResourceHolder
-    val uniforms: Uniforms
-    fun readRawTextFileUnsafe(resId: Int): String
-    fun getCubeVAO(): VertexArrayObject
-}
+import ru.vasilyknk.glwrapper.*
 
 class SceneParams {
     val view: Matrix4f = Matrix4f()
@@ -29,6 +18,13 @@ class MeshParams {
         sceneParams.view.mul(m, mv)
         sceneParams.proj.mul(mv, mvp)
     }
+}
+
+interface CubemapContext {
+    val rh: ResourceHolder
+    val sceneParams: SceneParams
+    fun readRawTextFileUnsafe(resId: Int): String
+    fun createFloatBuffer(data: FloatArray): BufferObject
 }
 
 class MeshProg(val prog: Program) {

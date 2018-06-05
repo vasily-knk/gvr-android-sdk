@@ -1,6 +1,7 @@
 package ru.vasilyknk.glwrapper
 
 import android.opengl.GLES20
+import android.opengl.GLES30
 import java.nio.Buffer
 
 data class VertexAttrib(
@@ -12,33 +13,50 @@ data class VertexAttrib(
         val bufferIndex: Int)
 
 
-class VertexArrayObject(val attribs: Array<VertexAttrib>, val buffers: Array<BufferObject>) {
-    fun use() {
+class VertexArrayObject internal constructor(attribs: Array<VertexAttrib>, buffers: Array<BufferObject>): Resource {
+    private val id: ResourceId
+
+    companion object {
+        fun unbindAll() {
+            GLES30.glBindVertexArray(0)
+        }
+    }
+
+    inner class Bind internal constructor() : AutoCloseable {
+        init {
+            GLES30.glBindVertexArray(id.get())
+        }
+
+        fun drawArrays(mode: Int, first: Int, count: Int) {
+            GLES30.glDrawArrays(mode, first, count)
+        }
+
+        override fun close() {}
+    }
+
+
+    init {
+        val arr = IntArray(1)
+        GLES30.glGenVertexArrays(1, arr, 0)
+        id = ResourceId(arr[0])
+
+        bind()
+
         for (attrib in attribs) {
             val buf = buffers[attrib.bufferIndex]
 
             buf.bind()
-            GLES20.glVertexAttribPointer(attrib.index, attrib.size, attrib.type, attrib.normalized, attrib.stride, 0)
-            GLES20.glEnableVertexAttribArray(attrib.index)
+            GLES30.glVertexAttribPointer(attrib.index, attrib.size, attrib.type, attrib.normalized, attrib.stride, 0)
+            GLES30.glEnableVertexAttribArray(attrib.index)
         }
     }
 
-    fun unUse() {
-        for (attrib in attribs) {
-            GLES20.glDisableVertexAttribArray(attrib.index)
-            buffers[attrib.bufferIndex].unbind()
-        }
-    }
+    fun bind() = Bind()
 
-    fun useLock() = UseLock()
+    override fun isValid() = id.isValid()
 
-    inner class UseLock : AutoCloseable {
-        init {
-            use()
-        }
-
-        override fun close() {
-            unUse()
-        }
+    override fun close() {
+        if (id.isValid())
+            GLES30.glDeleteVertexArrays(1, intArrayOf(id.get()), 0)
     }
 }

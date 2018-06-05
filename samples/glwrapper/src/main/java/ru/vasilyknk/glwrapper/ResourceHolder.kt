@@ -6,6 +6,7 @@ class ResourceHolder : AutoCloseable {
     fun createProgram(vertexShaderCode: String, fragmentShaderCode: String): Program = addResource(Program(vertexShaderCode, fragmentShaderCode))
     fun createBufferObject(target: Int): BufferObject = addResource(BufferObject(target))
     fun createTexture(target: Int): Texture = addResource(Texture(target))
+    fun createVertexArrayObject(attribs: Array<VertexAttrib>, buffers: Array<BufferObject>) = addResource(VertexArrayObject(attribs, buffers))
 
     private fun <T : Resource> addResource(res: T): T {
         resources.add(res)
