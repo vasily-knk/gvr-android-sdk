@@ -38,6 +38,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 
+import de.javagl.obj.ObjReader;
 import ru.vasilyknk.glwrapper.BufferObject;
 import ru.vasilyknk.glwrapper.Engine;
 import ru.vasilyknk.glwrapper.Program;
@@ -124,14 +125,19 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private Matrix4f cubeTransform = new Matrix4f();
   private Matrix4f floorTransform = new Matrix4f();
   private Matrix4f cubemapTransform = new Matrix4f().scale(30.f);
+  private Matrix4f objTransform = new Matrix4f();
 
   private MeshParams meshParams = new MeshParams();
+  private MeshRenderer meshRenderer = new MeshRenderer();
 
   private Matrix4f tempViewMatrix = new Matrix4f();
 
   private Texture cubemapTexture;
 
   private Cube cube;
+
+  private ObjMesh objMesh;
+  
 
 
   /**
@@ -228,6 +234,8 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
    */
   @Override
   public void onSurfaceCreated(EGLConfig config) {
+    String shading_version = GLES20.glGetString(GLES20.GL_SHADING_LANGUAGE_VERSION);
+
     rh = new ResourceHolder();
 
     Log.i(TAG, "onSurfaceCreated");
@@ -237,6 +245,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     initFloor();
     initCubemap();
 
+    objMesh = new ObjMesh(this);
 
     // Avoid any delays during start-up due to decoding of sound files.
     if (false)
@@ -263,6 +272,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     updateModelPosition();
 
     checkGLError("onSurfaceCreated");
+
 
     VertexArrayObject.Companion.unbindAll();
   }
@@ -324,7 +334,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
 
   void initCubemap() {
     Program prog = rh.createProgram(
-            readRawTextFileUnsafe(R.raw.light_vertex),
+            readRawTextFileUnsafe(R.raw.cubemap_vertex),
             readRawTextFileUnsafe(R.raw.cubemap_fragment));
 
     prog.use();
@@ -374,6 +384,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
             .identity()
             .translate(modelPosition)
     ;
+
 
     // Update the sound location to match it with the new cube position.
     if (sourceId != GvrAudioEngine.INVALID_ID) {
@@ -428,6 +439,12 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     return sceneParams;
   }
 
+  @NotNull
+  @Override
+  public InputStream openRawResource(int id) {
+    return getResources().openRawResource(id);
+  }
+
   /**
    * Prepares OpenGL ES before we draw a frame.
    *
@@ -436,6 +453,8 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   @Override
   public void onNewFrame(HeadTransform headTransform) {
     setCubeRotation();
+
+    objTransform.set(cubeTransform).scale(0.5f);
 
     camera.setLookAt(0.0f, 0.0f, CAMERA_Z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
@@ -488,9 +507,14 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
     sceneParams.getView().transformPosition(LIGHT_POS_IN_WORLD_SPACE, sceneParams.getViewLightPos());
     sceneParams.getProj().set(eye.getPerspective(Z_NEAR, Z_FAR));
 
-    cube.render(cubeTransform);
+    if (isLookingAtObject(cubeTransform))
+      objMesh.render(objTransform, meshRenderer);
+    else
+      cube.render(cubeTransform, meshRenderer);
+
     drawFloor();
     drawCubemap();
+
 
     VertexArrayObject.Companion.unbindAll();
 
@@ -542,7 +566,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   public void onCardboardTrigger() {
     Log.i(TAG, "onCardboardTrigger");
 
-    if (isLookingAtObject()) {
+    if (isLookingAtObject(cubeTransform)) {
       successSourceId = gvrAudioEngine.createStereoSound(SUCCESS_SOUND_FILE);
       gvrAudioEngine.playSound(successSourceId, false /* looping disabled */);
       hideObject();
@@ -602,10 +626,11 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
    *
    * @return true if the user is looking at the object.
    */
-  private boolean isLookingAtObject() {
+  @Override
+  public boolean isLookingAtObject(@NotNull Matrix4fc m) {
     // Convert object space to camera space. Use the headView from onNewFrame.
 
-    headView.mul(cubeTransform, tempViewMatrix);
+    headView.mul(m, tempViewMatrix);
     tempViewMatrix.transformPosition(POS_MATRIX_MULTIPLY_VEC, tempPosition);
 
 //    Matrix.multiplyMM(modelView, 0, headView, 0, modelCube, 0);
@@ -620,11 +645,11 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   private void applyMeshProg(MeshProg meshProg, Matrix4fc m) {
     meshParams.update(sceneParams, m);
 
-    Program.Usage usage = meshProg.getProg().use();
+    Program prog = meshProg.getProg();
 
-    usage.setUniform(meshProg.getLightPos(), sceneParams.getViewLightPos());
-    usage.setUniform(meshProg.getModel(), m, false);
-    usage.setUniform(meshProg.getModelView(), meshParams.getMv(), false);
-    usage.setUniform(meshProg.getModelViewProjection(), meshParams.getMvp(), false);
+    prog.setUniform(meshProg.getLightPos(), sceneParams.getViewLightPos());
+    prog.setUniform(meshProg.getModel(), m, false);
+    prog.setUniform(meshProg.getModelView(), meshParams.getMv(), false);
+    prog.setUniform(meshProg.getModelViewProjection(), meshParams.getMvp(), false);
   }
 }

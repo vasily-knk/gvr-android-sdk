@@ -3,6 +3,7 @@ package com.google.vr.sdk.samples.treasurehunt
 import android.opengl.GLES30
 import org.joml.*
 import ru.vasilyknk.glwrapper.*
+import java.io.InputStream
 
 class SceneParams {
     val view: Matrix4f = Matrix4f()
@@ -25,14 +26,12 @@ interface CubemapContext {
     val sceneParams: SceneParams
     fun readRawTextFileUnsafe(resId: Int): String
     fun createFloatBuffer(data: FloatArray): BufferObject
+    fun isLookingAtObject(m: Matrix4fc): Boolean
+
+    fun openRawResource(id: Int): InputStream
 }
 
-class MeshProg(val prog: Program) {
-    val model               = prog.getUniformLocation("u_Model")
-    val modelView           = prog.getUniformLocation("u_MVMatrix")
-    val modelViewProjection = prog.getUniformLocation("u_MVP")
-    val lightPos            = prog.getUniformLocation("u_LightPos")
-}
+
 
 fun createCubeTexCoords(): FloatArray {
     val numVerts = WorldLayoutData.CUBE_COORDS.size / 3

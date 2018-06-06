@@ -8,20 +8,8 @@ import ru.vasilyknk.glwrapper.VertexArrayObject
 import ru.vasilyknk.glwrapper.VertexAttrib
 
 class Cube(private val context: CubemapContext) {
-    val cubeVAO: VertexArrayObject
-    private val cubeFoundVAO: VertexArrayObject
-    private val cubeProgram: Program
-    private val uniformIndices: UniformIndices
-
-    private val mv = Matrix4f()
-    private val mvp = Matrix4f()
-
-    private class UniformIndices(prog: Program) {
-        val model               = prog.getUniformLocation("u_Model")
-        val modelView           = prog.getUniformLocation("u_MVMatrix")
-        val modelViewProjection = prog.getUniformLocation("u_MVP")
-        val lightPos            = prog.getUniformLocation("u_LightPos")
-    }
+    private val mesh: Mesh
+    private val foundMesh: Mesh
 
     init {
         val uvs = createCubeTexCoords()
@@ -32,9 +20,11 @@ class Cube(private val context: CubemapContext) {
         val cubeNormals     = context.createFloatBuffer(WorldLayoutData.CUBE_NORMALS)
         val cubeUVs         = context.createFloatBuffer(uvs)
 
-        cubeProgram = context.rh.createProgram(
+        val cubeProgram = context.rh.createProgram(
                 context.readRawTextFileUnsafe(R.raw.light_vertex),
                 context.readRawTextFileUnsafe(R.raw.passthrough_fragment))
+
+        val meshProg = MeshProg(cubeProgram)
 
         val positionIndex = cubeProgram.getAttribLocation("a_Position")
         val normalIndex   = cubeProgram.getAttribLocation("a_Normal")
@@ -47,31 +37,23 @@ class Cube(private val context: CubemapContext) {
                 VertexAttrib(colorIndex, 4, GLES20.GL_FLOAT, false, 0, 2),
                 VertexAttrib(uvIndex, 2, GLES20.GL_FLOAT, false, 0, 3))
 
-        cubeVAO = context.rh.createVertexArrayObject(attribs, arrayOf(cubeVertices, cubeNormals, cubeColors, cubeUVs))
+        val cubeVAO  = context.rh.createVertexArrayObject(attribs, arrayOf(cubeVertices, cubeNormals, cubeColors, cubeUVs))
 
-        cubeFoundVAO = context.rh.createVertexArrayObject(attribs, arrayOf(cubeVertices, cubeNormals, cubeFoundColors, cubeUVs))
+        val cubeFoundVAO = context.rh.createVertexArrayObject(attribs, arrayOf(cubeVertices, cubeNormals, cubeFoundColors, cubeUVs))
 
-        uniformIndices = UniformIndices(cubeProgram)
+        val cubeGeom = MeshGeom.Arrays(GLES20.GL_TRIANGLES, 0, 36)
+        
+        mesh = Mesh(meshProg, cubeVAO, arrayOf(cubeGeom))
+        foundMesh = Mesh(meshProg, cubeFoundVAO, arrayOf(cubeGeom))
     }
 
-    fun render(m: Matrix4fc) {
-        val sceneParams = context.sceneParams
+    fun getCubeVAO() = mesh.vao
 
-        sceneParams.view.mul(m, mv)
-        sceneParams.proj.mul(mv, mvp)
+    fun render(m: Matrix4fc, meshRenderer: MeshRenderer) {
+        val currentMesh = if (context.isLookingAtObject(m)) foundMesh else mesh
 
-        with (cubeProgram.use()) {
-            setUniform(uniformIndices.lightPos, sceneParams.viewLightPos)
-            setUniform(uniformIndices.model, m, false)
-            setUniform(uniformIndices.modelView, mv, false)
-            setUniform(uniformIndices.modelViewProjection, mvp, false)
-
-            // val vao = /*if (isLookingAtObject()) cubeFoundVAO else*/ cubeVAO
-
-            with (cubeVAO.bind()) {
-                drawArrays(GLES20.GL_TRIANGLES, 0, 36)
-            }
-        }
+        meshRenderer.update(currentMesh, context.sceneParams, m)
+        meshRenderer.render(currentMesh)
     }
 
 }

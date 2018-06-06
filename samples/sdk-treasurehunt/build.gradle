@@ -40,8 +40,11 @@ dependencies {
     compile 'com.google.vr:sdk-base:1.140.0'
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     compile 'org.joml:joml:1.9.3-SNAPSHOT'
+    compile 'de.javagl:obj:0.3.0'
     compile project(':samples-glwrapper')
 }
+
+
 repositories {
     mavenCentral()
     maven {

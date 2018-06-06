@@ -20,7 +20,7 @@ class BufferObject internal constructor (val target: Int) : Resource {
         GLES20.glBindBuffer(target, 0)
     }
 
-    fun setData(data: Buffer, size: Int, usage: Int) {
+    fun setData(data: Buffer, size: Int, usage: Int = GLES20.GL_STATIC_DRAW) {
         bind()
 
         GLES20.glBufferData(target, size, data, usage)

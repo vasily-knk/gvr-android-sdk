@@ -21,26 +21,20 @@ class Program internal constructor(vertexShaderCode: String, fragmentShaderCode:
         }
     }
 
-    inner class Usage : AutoCloseable {
-        init {
-            GLES30.glUseProgram(id.get())
-        }
-
-        fun setUniform(index: Int, vec: Vector3fc) {
-            vec.get(floatBuffer)
-            GLES20.glUniform3fv(index, 1, floatBuffer)
-        }
-
-        fun setUniform(index: Int, matrix: Matrix4fc, transpose: Boolean) {
-            matrix.get(floatBuffer)
-            GLES20.glUniformMatrix4fv(index, 1, transpose, floatBuffer)
-        }
-
-        override fun close() {}
+    fun use() {
+        GLES30.glUseProgram(id.get())
     }
 
-    fun use(): Usage {
-        return Usage()
+    fun setUniform(index: Int, vec: Vector3fc) {
+        use()
+        vec.get(floatBuffer)
+        GLES20.glUniform3fv(index, 1, floatBuffer)
+    }
+
+    fun setUniform(index: Int, matrix: Matrix4fc, transpose: Boolean) {
+        use()
+        matrix.get(floatBuffer)
+        GLES20.glUniformMatrix4fv(index, 1, transpose, floatBuffer)
     }
 
     fun getAttribLocation(name: String) = GLES30.glGetAttribLocation(id.get(), name)

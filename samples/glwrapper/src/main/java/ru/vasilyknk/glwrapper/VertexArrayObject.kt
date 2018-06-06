@@ -13,7 +13,10 @@ data class VertexAttrib(
         val bufferIndex: Int)
 
 
-class VertexArrayObject internal constructor(attribs: Array<VertexAttrib>, buffers: Array<BufferObject>): Resource {
+class VertexArrayObject internal constructor(
+        attribs: Array<VertexAttrib>,
+        buffers: Array<BufferObject>,
+        indices: BufferObject?): Resource {
     private val id: ResourceId
 
     companion object {
@@ -21,19 +24,6 @@ class VertexArrayObject internal constructor(attribs: Array<VertexAttrib>, buffe
             GLES30.glBindVertexArray(0)
         }
     }
-
-    inner class Bind internal constructor() : AutoCloseable {
-        init {
-            GLES30.glBindVertexArray(id.get())
-        }
-
-        fun drawArrays(mode: Int, first: Int, count: Int) {
-            GLES30.glDrawArrays(mode, first, count)
-        }
-
-        override fun close() {}
-    }
-
 
     init {
         val arr = IntArray(1)
@@ -49,9 +39,13 @@ class VertexArrayObject internal constructor(attribs: Array<VertexAttrib>, buffe
             GLES30.glVertexAttribPointer(attrib.index, attrib.size, attrib.type, attrib.normalized, attrib.stride, 0)
             GLES30.glEnableVertexAttribArray(attrib.index)
         }
+
+        indices?.bind()
     }
 
-    fun bind() = Bind()
+    fun bind() {
+        GLES30.glBindVertexArray(id.get())
+    }
 
     override fun isValid() = id.isValid()
 
