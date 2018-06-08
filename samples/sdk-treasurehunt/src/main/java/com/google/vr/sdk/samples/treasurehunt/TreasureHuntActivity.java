@@ -36,6 +36,8 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.util.Random;
+
 import javax.microedition.khronos.egl.EGLConfig;
 
 import de.javagl.obj.ObjReader;
@@ -346,16 +348,16 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
 
     final int width = 256, height = 256;
 
+    Random random = new Random();
+
     byte[] bytes = new byte[width * height * 4];
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             int offset = (y * width + x) * 4;
 
-            byte val = (byte)(x + y % 256);
-
-            bytes[offset + 0] = val;
-            bytes[offset + 1] = 0;
-            bytes[offset + 2] = 0;
+            bytes[offset + 0] = (byte)(random.nextInt(128));
+            bytes[offset + 1] = (byte)(random.nextInt(128));
+            bytes[offset + 2] = (byte)(random.nextInt(128));
             bytes[offset + 3] = 1;
         }
     }
@@ -454,7 +456,7 @@ public class TreasureHuntActivity extends GvrActivity implements GvrView.StereoR
   public void onNewFrame(HeadTransform headTransform) {
     setCubeRotation();
 
-    objTransform.set(cubeTransform).scale(0.5f);
+    objTransform.set(cubeTransform).scale(0.005f);
 
     camera.setLookAt(0.0f, 0.0f, CAMERA_Z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 

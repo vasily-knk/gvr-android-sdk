@@ -8,7 +8,7 @@ class ObjMesh(val context: CubemapContext) {
 
     init {
         val loader = ObjLoader(context.rh)
-        val inputStream = context.openRawResource(R.raw.teapot)
+        val inputStream = context.openRawResource(R.raw.helicopter)
 
         val obj = loader.load(inputStream)
 
